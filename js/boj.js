@@ -7,13 +7,13 @@ let get_html = (url) => get_url(url).then(html => new DOMParser().parseFromStrin
 
 let get_text = (infos, index) => infos.map(async data => {
   let cell = await data;
-  return cell[index].textContent;
+  return cell[index].textContent.trim();
 });
 
 let get_textContent = (problem_infos, keyword) => problem_infos.map(async data => {
   let html = await data;
   let content = html.getElementById(keyword);
-  return content != null ? html.getElementById(keyword).textContent : '';
+  return content != null ? html.getElementById(keyword).textContent.trim() : '';
 });
 
 let get_cells = (problem_infos, keyword) => problem_infos.map(async data => {
@@ -115,43 +115,82 @@ function language_to_extension(language) {
   }
 }
 
+function extension_to_language(extension) {
+  switch (extension) {
+    case ".java":
+      return "Java Language Solution";
+    case ".cc":
+      return "C++ Language Solution";
+    case ".c":
+      return "C Language Solution";
+    case ".py":
+      return "Python Language Solution";
+    case ".go":
+      return "Go Language Solution";
+    case ".rs":
+      return "Rust Language Solution";
+    case ".kt":
+      return "Kotlin Language Solution";
+  }
+}
+
+async function readme(problem_infos, ext, sols, number, i) {
+  // problem info
+  let title = await problem_infos.titles[i];
+  let infos = await problem_infos.infos[i];
+  let limit_time = infos[0].textContent;
+  let limit_memory = infos[1].textContent;
+  console.log(infos)
+  console.log(limit_time)
+  console.log(limit_memory)
+  let description = await problem_infos.descriptions[i];
+  let input = await problem_infos.inputs[i];
+  let output = await problem_infos.outputs[i];
+
+  // solution info
+  let language = extension_to_language(ext);
+  let time = await sols.time[i];
+  let memory = await sols.memory[i];
+  let length = await sols.length[i];
+
+  // make README
+  return `# ${title}\n\n#### 시간 제한\n\n> ${limit_time}\n\n#### 메모리 제한\n\n> ${limit_memory}\n\n### 문제 내용\n\n${description}\n\n### 입력\n\n${input}\n\n### 출력\n\n${output}\n\n> 이 문제는 [Boj ${number}번 문제](https://www.acmicpc.net/problem/${number})입니다.\n\n## Solution\n\n### [${language}](./main${ext})\n\n#### 걸린 시간\n\n> ${time} ms\n\n#### 사용한 메모리\n\n> ${memory} KB\n\n#### 코드 Byte\n\n> ${length} Byte\n`
+}
+
 async function zip_problems(username) {
   let zip = new JSZip();
 
   let problems = await get_problems(username);
-  let problem_infos = get_problem_infos(problems)
-  let solutions = get_solution_infos(problems, username);
-  let sols = await solutions;
+  let problem_infos = await get_problem_infos(problems)
+  let sols = await get_solution_infos(problems, username);
   let source = await get_source(sols.numbers);
 
   let result = zip.folder("algorithm");
   for (let i = 0; i < problems.length; ++i) {
     let number = await problems[i];
-    let folder = result.folder(number);
 
+    // source code
     let language = await sols.language[i];
     let ext = language_to_extension(language);
     let content = await source[i];
-    let filename = folder.file("main"+ext, content);
+    let filename = "main"+ext;
+
+    // README
+    let readme_file = await readme(problem_infos, ext, sols, number, i);
+    console.log(readme_file)
+    let folder = result.folder(number);
+    folder.file(filename, content);
+    folder.file("README", readme_file);
 
   }
 
   zip.generateAsync({type:"blob"})
     .then(function(content) {
-      fileSaver.saveAs(content, "algoithm.zip");
+      fileSaver.saveAs(content, "algorithm.zip");
       console.log(content)
-      console.log("World")
-    })
-    .catch(err => {
-      console.log(err);
-      console.log("World");
     });
 }
 
 export {
-  get_problems,
-  get_problem_infos,
-  get_solution_infos,
-  get_source,
   zip_problems,
 };

@@ -1,4 +1,4 @@
-import {zip_problems} from "./js/boj";
+import { zip_problems } from "./js/boj";
 
 let username = 'gurwls9628'
 
@@ -9,5 +9,4 @@ chrome.storage.local.get('username', function(data) {
 let changeColor = document.getElementById("changeColor");
 changeColor.onclick = async function(element) {
   await zip_problems(username);
-  console.log("Hello")
 };
