@@ -1,12 +1,13 @@
 import { zip_problems } from "./js/boj";
 
-let username = 'gurwls9628'
+let download_boj = document.getElementById("download_boj");
+download_boj.onclick = async function(element) {
+  chrome.storage.local.get('username', async function(data) {
+    let username = data.username;
+    if (username === undefined) {
+      alert("로그인이 필요합니다.")
+    }
 
-chrome.storage.local.get('username', function(data) {
-  username = data.username;
-});
-
-let changeColor = document.getElementById("changeColor");
-changeColor.onclick = async function(element) {
-  await zip_problems(username);
+    await zip_problems(username);
+  });
 };

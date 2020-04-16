@@ -140,9 +140,6 @@ async function readme(problem_infos, ext, sols, number, i) {
   let infos = await problem_infos.infos[i];
   let limit_time = infos[0].textContent;
   let limit_memory = infos[1].textContent;
-  console.log(infos)
-  console.log(limit_time)
-  console.log(limit_memory)
   let description = await problem_infos.descriptions[i];
   let input = await problem_infos.inputs[i];
   let output = await problem_infos.outputs[i];
@@ -165,7 +162,8 @@ async function zip_problems(username) {
   let sols = await get_solution_infos(problems, username);
   let source = await get_source(sols.numbers);
 
-  let result = zip.folder("algorithm");
+  let root = zip.folder("algorithm");
+  let boj_folder = root.folder("boj");
   for (let i = 0; i < problems.length; ++i) {
     let number = await problems[i];
 
@@ -177,17 +175,14 @@ async function zip_problems(username) {
 
     // README
     let readme_file = await readme(problem_infos, ext, sols, number, i);
-    console.log(readme_file)
-    let folder = result.folder(number);
+    let folder = boj_folder.folder(number);
     folder.file(filename, content);
     folder.file("README", readme_file);
-
   }
 
   zip.generateAsync({type:"blob"})
     .then(function(content) {
       fileSaver.saveAs(content, "algorithm.zip");
-      console.log(content)
     });
 }
 
