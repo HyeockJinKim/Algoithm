@@ -134,7 +134,7 @@ function extension_to_language(extension) {
   }
 }
 
-async function readme(problem_infos, ext, sols, number, i) {
+async function readme(problem_infos, language, ext, sols, number, i) {
   // problem info
   let title = await problem_infos.titles[i];
   let infos = await problem_infos.infos[i];
@@ -145,13 +145,31 @@ async function readme(problem_infos, ext, sols, number, i) {
   let output = await problem_infos.outputs[i];
 
   // solution info
-  let language = extension_to_language(ext);
   let time = await sols.time[i];
   let memory = await sols.memory[i];
   let length = await sols.length[i];
 
   // make README
-  return `# ${title}\n\n#### 시간 제한\n\n> ${limit_time}\n\n#### 메모리 제한\n\n> ${limit_memory}\n\n### 문제 내용\n\n${description}\n\n### 입력\n\n${input}\n\n### 출력\n\n${output}\n\n> 이 문제는 [Boj ${number}번 문제](https://www.acmicpc.net/problem/${number})입니다.\n\n## Solution\n\n### [${language}](./main${ext})\n\n#### 걸린 시간\n\n> ${time} ms\n\n#### 사용한 메모리\n\n> ${memory} KB\n\n#### 코드 Byte\n\n> ${length} Byte\n`
+  return `# ${title}\n\n
+#### 시간 제한\n\n
+> ${limit_time}\n\n
+#### 메모리 제한\n\n
+> ${limit_memory}\n\n
+### 문제 내용\n\n
+${description}\n\n
+### 입력\n\n
+${input}\n\n
+### 출력\n\n
+${output}\n\n
+> 이 문제는 [Boj ${number}번 문제](https://www.acmicpc.net/problem/${number})입니다.\n\n
+## Solution\n\n
+### [${language}](./main${ext})\n\n
+#### 걸린 시간\n\n
+> ${time} ms\n\n
+#### 사용한 메모리\n\n
+> ${memory} KB\n\n
+#### 코드 Byte\n\n
+> ${length} Byte\n`
 }
 
 async function zip_problems(username) {
@@ -164,6 +182,7 @@ async function zip_problems(username) {
 
   let root = zip.folder("algorithm");
   let boj_folder = root.folder("boj");
+  let language_count = {};
   for (let i = 0; i < problems.length; ++i) {
     let number = await problems[i];
 
@@ -172,18 +191,30 @@ async function zip_problems(username) {
     let ext = language_to_extension(language);
     let content = await source[i];
     let filename = "main"+ext;
-
+    language = extension_to_language(ext);
+    if (language_count[language] === undefined)
+      language_count[language] = 0;
+    language_count[language] += 1;
     // README
-    let readme_file = await readme(problem_infos, ext, sols, number, i);
+    let readme_file = await readme(problem_infos, language, ext, sols, number, i);
     let folder = boj_folder.folder(number);
     folder.file(filename, content);
-    folder.file("README", readme_file);
+    folder.file("README.md", readme_file);
   }
+  let root_readme = "# 알고리즘 문제 소스 코드 정리\n\n" +
+    "> by [Algoithm](https://github.com/HyeockJinKim/Algoithm)\n\n" +
+    "## 사용 언어\n\n";
 
+  root_readme = Object.keys(language_count)
+                .map(key => [language_count[key], key])
+                .sort((a, b) => b[0] - a[0])
+                .reduce((init, lang) => init +
+                  `### ${lang[1]}\n\n`+
+                  `> ${lang[0]} 개\n\n`, root_readme);
+
+  root.file("README.md", root_readme);
   zip.generateAsync({type:"blob"})
-    .then(function(content) {
-      fileSaver.saveAs(content, "algorithm.zip");
-    });
+    .then(content => fileSaver.saveAs(content, "algorithm.zip"));
 }
 
 export {
