@@ -1,26 +1,59 @@
 const JSZip = require(`jszip`);
 const fileSaver = require(`file-saver`);
 
+/**
+ * url에 요청한 값을 그대로 읽음
+ * @param url: 요청할 url
+ * @returns {Promise<string>}: Promise<요청 데이터>
+ */
 let get_url = (url) => fetch(url).then(data => data.text());
 
+/**
+ * url에 요청한 값을 html로 읽음
+ * @param url: 요청할 url
+ * @returns {Promise<Document>}: Promise<요청 html>
+ */
 let get_html = (url) => get_url(url).then(html => new DOMParser().parseFromString(html, "text/html"));
 
-let get_text = (infos, index) => infos.map(async data => {
+/**
+ * ul 태그의 값 중 특정 index의 값을 읽는 함수
+ * @param infos: ul 값을 저장한 list
+ * @param index: 읽으려는 index
+ * @returns [Promise<string>, ...]
+ */
+let get_text_index = (infos, index) => infos.map(async data => {
   let cell = await data;
   return cell[index].textContent.trim();
 });
 
-let get_textContent = (problem_infos, keyword) => problem_infos.map(async data => {
+/**
+ * html 중 특정 id 태그의 Text content 값을 읽어 오는 함수
+ * @param problem_infos: 백준 문제 정보들
+ * @param keyword: 값을 읽으려는 태그의 id
+ * @returns [Promise<string>, ...]
+ */
+let get_text_of_keyword = (problem_infos, keyword) => problem_infos.map(async data => {
   let html = await data;
   let content = html.getElementById(keyword);
   return content != null ? html.getElementById(keyword).textContent.trim() : '';
 });
 
-let get_cells = (problem_infos, keyword) => problem_infos.map(async data => {
+/**
+ * Table 중 헤더를 제외한 첫번째 row 값을 읽어오는 함수
+ * @param problem_infos: 요청한 Promise<html> list
+ * @param keyword: 읽으려는 table의 id
+ * @returns [Promise<li Tag>, ...]
+ */
+let get_first_row = (problem_infos, keyword) => problem_infos.map(async data => {
   let html = await data;
   return html.getElementById(keyword).rows[1].cells;
 });
 
+/**
+ * user가 푼 백준의 문제 리스트를 가져오는 함수
+ * @param username: 백준 아이디
+ * @returns {Promise<string[]>}
+ */
 async function get_problems(username) {
   let html = await get_html('https://www.acmicpc.net/user/'+username);
   let problems = html.getElementsByClassName('panel-body')[0]
@@ -29,15 +62,20 @@ async function get_problems(username) {
   return [...problems].map(name => name.textContent);
 }
 
+/**
+ * 특정 문제의 정보를 가져오는 함수
+ * @param problems: 풀었던 문제 번호 List
+ * @returns {Promise<{outputs: Promise<string>[], inputs: Promise<string>[], titles: Promise<string>[], descriptions: Promise<string>[], infos: Promise<li, Tag>[]}>}
+ */
 async function get_problem_infos(problems) {
   let problem_infos = problems.map(async problem => await get_html('https://www.acmicpc.net/problem/'+problem));
 
-  let titles = get_textContent(problem_infos, 'problem_title');
-  let descriptions = get_textContent(problem_infos, 'problem_description');
-  let inputs = get_textContent(problem_infos, 'problem_input');
-  let outputs = get_textContent(problem_infos, 'problem_output');
+  let titles = get_text_of_keyword(problem_infos, 'problem_title');
+  let descriptions = get_text_of_keyword(problem_infos, 'problem_description');
+  let inputs = get_text_of_keyword(problem_infos, 'problem_input');
+  let outputs = get_text_of_keyword(problem_infos, 'problem_output');
 
-  let infos = get_cells(problem_infos, 'problem-info');
+  let infos = get_first_row(problem_infos, 'problem-info');
 
   return {
     titles,
@@ -48,20 +86,26 @@ async function get_problem_infos(problems) {
   }
 }
 
+/**
+ * 유저가 풀었던 답의 정보를 가져오는 함수
+ * @param problems: 문제 번호
+ * @param username: 백준 아이디
+ * @returns {Promise<{memory: Promise<string>[], success: Promise<string>[], numbers: Promise<string>[], length: Promise<string>[], language: string[], time: Promise<string>[]}>}
+ */
 async function get_solution_infos(problems, username) {
   let solution = problems.map(async problem =>
     await get_html('https://www.acmicpc.net/status?from_mine=1&problem_id='+problem+'&user_id='+username));
 
-  let infos = get_cells(solution, 'status-table');
-  let numbers = get_text(infos, 0);
-  let success = get_text(infos, 3);
-  let memory = get_text(infos, 4);
-  let time = get_text(infos, 5);
+  let infos = get_first_row(solution, 'status-table');
+  let numbers = get_text_index(infos, 0);
+  let success = get_text_index(infos, 3);
+  let memory = get_text_index(infos, 4);
+  let time = get_text_index(infos, 5);
   let language = infos.map(async info => {
     let temp = await info;
     return temp[6].textContent.split('/')[0].trim()
   });
-  let length = get_text(infos, 7);
+  let length = get_text_index(infos, 7);
 
   return {
     numbers,
@@ -73,6 +117,11 @@ async function get_solution_infos(problems, username) {
   }
 }
 
+/**
+ * 유저가 풀었던 답의 소스코드를 가져오는 함수
+ * @param solutions: 제출한 소스 코드 번호
+ * @returns {Promise<source code>}
+ */
 async function get_source(solutions) {
   return solutions.map(async solution => {
     let url = await solution;
@@ -80,6 +129,11 @@ async function get_source(solutions) {
   });
 }
 
+/**
+ * 언어에 따른 확장자를 구하는 함수
+ * @param language: 프로그래밍 언어
+ * @returns {string}: 확장자
+ */
 function language_to_extension(language) {
   switch (language) {
     case "Java":
@@ -115,6 +169,11 @@ function language_to_extension(language) {
   }
 }
 
+/**
+ * 확장자에서 풀었던 언어 정보를 가져오는 함수
+ * @param extension: 확장자
+ * @returns {string}: 풀었던 언어 정보
+ */
 function extension_to_language(extension) {
   switch (extension) {
     case ".java":
@@ -134,6 +193,16 @@ function extension_to_language(extension) {
   }
 }
 
+/**
+ * 문제를 풀었던 정보를 README 로 작성하는 함수
+ * @param problem_infos: 문제 정보 dictionary
+ * @param language: 언어
+ * @param ext: 확장자
+ * @param sols: 문제 solution 정보 dictionary
+ * @param number: 백준 문제 번호
+ * @param i: 풀었던 문제들 중 몇번째 인지
+ * @returns {Promise<string>}: README
+ */
 async function readme(problem_infos, language, ext, sols, number, i) {
   // problem info
   let title = await problem_infos.titles[i];
@@ -172,6 +241,11 @@ ${output}\n\n
 > ${length} Byte\n`
 }
 
+/**
+ * 풀었던 문제들을 파싱해서 zip 압축파일로 저장하는 함수
+ * @param username: 백준 id
+ * @returns {Promise<void>}
+ */
 async function zip_problems(username) {
   let zip = new JSZip();
 
