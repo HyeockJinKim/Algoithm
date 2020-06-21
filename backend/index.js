@@ -7,7 +7,6 @@ download_boj.onclick = async function(element) {
     if (username === undefined) {
       alert("로그인이 필요합니다.")
     }
-
     await zip_problems(username);
   });
 };

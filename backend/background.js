@@ -10,7 +10,6 @@ function get_username() {
 
 chrome.runtime.onInstalled.addListener(function() {
   chrome.storage.local.set({username: get_username()});
-
   chrome.declarativeContent.onPageChanged.removeRules(undefined, function() {
     chrome.declarativeContent.onPageChanged.addRules([{
       conditions: ['www.acmicpc.net'].map(url => new chrome.declarativeContent.PageStateMatcher({

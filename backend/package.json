@@ -7,8 +7,8 @@
   "author": "HyeockJinKim <kherootz@gmail.com>",
   "license": "MIT",
   "scripts": {
-    "build": "webpack",
-    "watch": "webpack -w"
+    "build": "../node_modules/.bin/webpack",
+    "watch": "../node_modules/.bin/webpack -w"
   },
   "dependencies": {
     "babel-loader": "^8.1.0",
@@ -16,5 +16,8 @@
     "jszip": "^3.3.0",
     "webpack": "^4.42.1",
     "webpack-cli": "^3.3.11"
+  },
+  "devDependencies": {
+    "typescript": "^3.9.5"
   }
 }
