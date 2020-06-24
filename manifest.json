@@ -1,20 +1,27 @@
 {
-  "name": "Getting Started Example",
+  "name": "Algoithm is source code management extension for algorithm",
   "version": "1.0",
   "description": "Build an Extension!",
-  "permissions": ["activeTab", "declarativeContent", "storage"],
+  "permissions": ["activeTab", "declarativeContent", "storage", "tabs"],
   "background": {
     "scripts": ["backend/background.js"],
     "persistent": false
   },
+  "content_scripts": [
+    {
+      "matches": ["http://www.acmicpc.net/*", "https://www.acmicpc.net/*"],
+      "js": ["backend/contentscript.js"]
+    }
+  ],
   "page_action": {
-    "default_popup": "popup.html",
+    "default_popup": "frontend/build/index.html",
     "default_icon": {
       "128": "images/github-logo-face128.png"
     }
   },
   "icons": {
-    "128": "images/get_started128.png"
+    "128": "images/github-logo-face128.png"
   },
+  "content_security_policy": "script-src 'self' 'sha256-CQC5LdTaptYKkE0/R3O0MafFb1pWSMIY0AijSJocStY='",
   "manifest_version": 2
 }
