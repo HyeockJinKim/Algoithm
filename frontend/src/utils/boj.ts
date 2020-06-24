@@ -1,5 +1,5 @@
 import {get_first_row, get_html, get_cell_index, get_url, get_text_from_id} from "./request";
-import {language_to_extension} from "./language";
+import {boj_language_to_language, language_to_extension} from "./language";
 const JSZip = require(`jszip`);
 const fileSaver = require(`file-saver`);
 
@@ -161,9 +161,10 @@ export async function boj_zip(username: string) {
     const solution = await solution_infos[i];
     const source = await source_list[i];
     const filename = "main"+solution.extension;
-    if (language_count[solution.language] === undefined)
-      language_count[solution.language] = 0;
-    language_count[solution.language] += 1;
+    const language = boj_language_to_language(solution.language);
+    if (language_count[language] === undefined)
+      language_count[language] = 0;
+    language_count[language] += 1;
     // README
     let readme_file = await readme(problem, solution);
     let folder = boj_folder.folder(problem.number);
