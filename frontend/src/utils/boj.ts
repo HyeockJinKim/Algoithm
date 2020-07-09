@@ -1,5 +1,7 @@
 import {get_first_row, get_html, get_cell_index, get_url, get_text_from_id} from "./request";
 import {boj_language_to_language, language_to_extension} from "./language";
+import {push_source} from "./github";
+
 const JSZip = require(`jszip`);
 const fileSaver = require(`file-saver`);
 
@@ -29,84 +31,64 @@ type Solution = {
  * @returns {Promise<string[]>}
  */
 async function get_problems(username: string): Promise<string[]> {
-  const html = await get_html('https://www.acmicpc.net/user/'+username);
-  const problems = html.getElementsByClassName('panel-body')[0]
-    .getElementsByClassName('problem_number');
-  return Array.from(problems).map(name => name.textContent!);
+  return get_html('https://www.acmicpc.net/user/' + username)
+    .then(html => html.getElementsByClassName('panel-body')[0])
+    .then(span => span.getElementsByClassName('problem_number'))
+    .then(collections => Array.from(collections))
+    .then(arr => arr.map(name => name.textContent!));
 }
 
 /**
  * 특정 문제의 정보를 가져오는 함수
- * @param problems: 풀었던 문제 번호 List
+ * @param number: 풀었던 문제 번호
  * @returns 문제 정보
  */
-function get_problem_infos(problems: string[]): Promise<Problem>[] {
-  return problems
-    .map(async number => {
-      const html = await get_html('https://www.acmicpc.net/problem/'+number);
-      const title = get_text_from_id(html, 'problem_title');
-      const description = get_text_from_id(html, 'problem_description');
-      const input = get_text_from_id(html, 'problem_input');
-      const output = get_text_from_id(html, 'problem_output');
+function get_problem_info(number: string): Promise<Problem> {
+  return get_html('https://www.acmicpc.net/problem/' + number)
+    .then(html => {
       const info = get_first_row(html, 'problem-info');
-      const limit_time = info[0].textContent!;
-      const limit_memory = info[1].textContent!;
-
       return {
         number,
-        title,
-        description,
-        input,
-        output,
-        limit_time,
-        limit_memory,
-      }
+        title: get_text_from_id(html, 'problem_title'),
+        description: get_text_from_id(html, 'problem_description'),
+        input: get_text_from_id(html, 'problem_input'),
+        output: get_text_from_id(html, 'problem_output'),
+        limit_time: info[0].textContent!,
+        limit_memory: info[1].textContent!,
+      };
     });
 }
 
 /**
  * 유저가 풀었던 답의 소스코드를 가져오는 함수
- * @param solutions: 제출한 소스 코드 번호
- * @returns 소스 코드 []
+ * @param solution: 제출한 소스 코드 번호
+ * @returns 소스 코드
  */
-function get_source(solutions: Promise<string>[]): Promise<string>[] {
-  return solutions.map(async solution => {
-    let url = await solution;
-    return await get_url('https://www.acmicpc.net/source/download/' + url);
-  });
+function get_source(solution: string): Promise<string> {
+  return get_url('https://www.acmicpc.net/source/download/' + solution);
 }
 
 /**
  * 유저가 풀었던 답의 정보를 가져오는 함수
- * @param problems: 문제 번호[]
+ * @param problem: 문제 번호
  * @param username: 백준 아이디
  * @returns Solution
  */
-function get_solution_infos(problems: string[], username: string): Promise<Solution>[] {
-  return problems
-    .map(problem => get_html('https://www.acmicpc.net/status?from_mine=1&problem_id='+problem+'&user_id='+username))
-    .map(async _html => {
-      const html = await _html;
-      const infos = get_first_row(html, 'status-table');
-
-      const number = get_cell_index(infos, 0);
-      const success = get_cell_index(infos, 3);
-      const memory = get_cell_index(infos, 4);
-      const time = get_cell_index(infos, 5);
-      const language = get_cell_index(infos, 6).split('/')[0].trim();
-      const extension = language_to_extension(language);
-      const length = get_cell_index(infos, 7);
-
+function get_solution_info(problem: string, username: string): Promise<Solution> {
+  return get_html('https://www.acmicpc.net/status?from_mine=1&problem_id=' + problem + '&user_id=' + username)
+    .then(html => get_first_row(html, 'status-table'))
+    .then(info => {
+      const language = get_cell_index(info, 6).split('/')[0].trim();
       return {
-        number,
-        success,
-        memory,
-        time,
-        language,
-        extension,
-        length,
+        number: get_cell_index(info, 0),
+        success: get_cell_index(info, 3),
+        memory: get_cell_index(info, 4),
+        time: get_cell_index(info, 5),
+        language: get_cell_index(info, 6).split('/')[0].trim(),
+        extension: language_to_extension(language),
+        length: get_cell_index(info, 7)
       }
-    });
+    })
 }
 
 /**
@@ -139,52 +121,63 @@ ${problem.output}\n\n
 > ${solution.length} Byte\n`
 }
 
+function root_readme(language_count: { [key: string]: number }): string {
+  const base = "# 알고리즘 문제 소스 코드 정리\n\n" +
+    "> by [Algoithm](https://github.com/HyeockJinKim/Algoithm)\n\n" +
+    "## 사용 언어\n\n";
+
+  return Object.keys(language_count)
+    .map(key => {
+      return {count: language_count[key], language: key};
+    })
+    .sort((a, b) => b.count - a.count)
+    .reduce((init, lang) => init +
+      `### ${lang.language}\n\n` +
+      `> ${lang.count} 개\n\n`, base);
+}
+
+async function get_boj_source(username: string, language_count: { [key: string]: number }) {
+  const problems = await get_problems(username);
+
+  return problems.map(async problem => {
+    const problem_info = await get_problem_info(problem),
+      solution_info = await get_solution_info(problem, username),
+      source = await get_source(solution_info.number),
+      language = boj_language_to_language(solution_info.language);
+    language_count[language] = language_count[language] === undefined ? 1 : language_count[language] + 1;
+    return {
+      title: problem,
+      filename: "main" + solution_info.extension,
+      code: source,
+      readme: readme(problem_info, solution_info)
+    }
+  });
+}
+
 /**
  * 풀었던 문제들을 파싱해서 zip 압축파일로 저장하는 함수
  * @param username: 백준 id
  * @returns {Promise<void>}
  */
 export async function boj_zip(username: string) {
-  let zip = new JSZip();
+  const language_count = {},
+    zip = new JSZip(),
+    root = zip.folder("algorithm"),
+    boj_folder = root.folder("boj");
+  await get_boj_source(username, language_count)
+    .then(sources => Promise.all(sources.map(res =>
+      res.then(source => {
+        const folder = boj_folder.folder(source.title);
+        folder.file(source.filename, source.code);
+        folder.file("README.md", source.readme);
+      })))
+      .then(_ => {
+        root.file("README.md", root_readme(language_count));
+        zip.generateAsync({type: "blob"})
+          .then((content: Blob) => fileSaver.saveAs(content, "algorithm.zip"));
+      }));
+}
 
-  const problems = await get_problems(username);
-  const problem_infos = get_problem_infos(problems);
-  const solution_infos = get_solution_infos(problems, username);
-  const solution_numbers = solution_infos.map(solution => solution.then(sol => sol.number));
-  const source_list = get_source(solution_numbers);
-
-  const root = zip.folder("algorithm");
-  const boj_folder = root.folder("boj");
-  const language_count: {[key: string]: number} = {};
-  for (let i = 0; i < problems.length; ++i) {
-    const problem = await problem_infos[i];
-    const solution = await solution_infos[i];
-    const source = await source_list[i];
-    const filename = "main"+solution.extension;
-    const language = boj_language_to_language(solution.language);
-    if (language_count[language] === undefined)
-      language_count[language] = 0;
-    language_count[language] += 1;
-    // README
-    let readme_file = await readme(problem, solution);
-    let folder = boj_folder.folder(problem.number);
-    folder.file(filename, source);
-    folder.file("README.md", readme_file);
-  }
-  let root_readme = "# 알고리즘 문제 소스 코드 정리\n\n" +
-    "> by [Algoithm](https://github.com/HyeockJinKim/Algoithm)\n\n" +
-    "## 사용 언어\n\n";
-
-  root_readme = Object.keys(language_count)
-    .map(key => {
-      return {count: language_count[key], language: key};
-    })
-    .sort((a, b) => b.count - a.count)
-    .reduce((init, lang) => init +
-      `### ${lang.language}\n\n`+
-      `> ${lang.count} 개\n\n`, root_readme);
-
-  root.file("README.md", root_readme);
-  zip.generateAsync({type:"blob"})
-    .then((content: Blob) => fileSaver.saveAs(content, "algorithm.zip"));
+export async function boj_github(username: string, github_username: string, password: string) {
+  await get_boj_source(username, {})
 }
