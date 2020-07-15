@@ -1,6 +1,6 @@
 import {get_first_row, get_html, get_cell_index, get_url, get_text_from_id} from "./request";
 import {boj_language_to_language, language_to_extension} from "./language";
-import {push_source} from "./github";
+import {push_source, UserConfig} from "./github";
 
 const JSZip = require(`jszip`);
 const fileSaver = require(`file-saver`);
@@ -148,7 +148,7 @@ async function get_boj_source(username: string, language_count: { [key: string]:
     return {
       title: problem,
       filename: "main" + solution_info.extension,
-      code: source,
+      source,
       readme: readme(problem_info, solution_info)
     }
   });
@@ -168,7 +168,7 @@ export async function boj_zip(username: string) {
     .then(sources => Promise.all(sources.map(res =>
       res.then(source => {
         const folder = boj_folder.folder(source.title);
-        folder.file(source.filename, source.code);
+        folder.file(source.filename, source.source);
         folder.file("README.md", source.readme);
       })))
       .then(_ => {
@@ -178,6 +178,13 @@ export async function boj_zip(username: string) {
       }));
 }
 
-export async function boj_github(username: string, github_username: string, password: string) {
-  await get_boj_source(username, {})
+export async function boj_github(username: string, config: UserConfig) {
+  const language_count = {};
+  await get_boj_source(username, language_count)
+    .then(sources => Promise.all(sources.map(res =>
+      res.then(source => {
+        push_source(config, source);
+
+      }))));
+
 }
