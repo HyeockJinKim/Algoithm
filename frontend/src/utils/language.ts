@@ -32,6 +32,7 @@ export function language_to_extension(language: string): string {
     case "Go":
       return ".go";
     case "Rust":
+    case "Rust 2018":
       return ".rs"
     case "Kotlin (JVM)":
     case "Kotlin (Native)":
@@ -74,6 +75,7 @@ export function boj_language_to_language(language: string): string {
     case "Go":
       return "Go";
     case "Rust":
+    case "Rust 2018":
       return "Rust"
     case "Kotlin (JVM)":
     case "Kotlin (Native)":

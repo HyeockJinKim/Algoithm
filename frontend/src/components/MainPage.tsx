@@ -1,13 +1,14 @@
 import React, {useState} from 'react';
 import {makeStyles} from '@material-ui/core/styles';
 import Button from '@material-ui/core/Button';
-import Card from '@material-ui/core/Card';
-import CardContent from '@material-ui/core/CardContent';
 import GitHubIcon from '@material-ui/icons/GitHub';
 import SaveIcon from '@material-ui/icons/Save';
-import {boj_zip} from "../utils/boj";
-import {Input} from "@material-ui/core";
-import {get_email, get_repos, push_source} from "../utils/github";
+import {boj_github, boj_zip} from "../utils/boj";
+import {get_email, get_repos, Repo} from "../utils/github";
+import Username from "./Username";
+import Email from "./Email";
+import Repository from "./Repository";
+import Password from "./Password";
 
 enum Site {
   None,
@@ -16,14 +17,21 @@ enum Site {
 
 enum Mode {
   None,
-  Github,
-  Email,
+  Username,
   Repo,
+  Password,
+  Email,
 }
 
 const useStyles = makeStyles((theme) => ({
   button: {
     margin: theme.spacing(1),
+  },
+  title: {
+    fontSize: 14,
+  },
+  pos: {
+    marginBottom: 12,
   }
 }));
 
@@ -74,9 +82,9 @@ function MainPage() {
   const [mode, setMode] = useState<Mode>(Mode.None);
   const [githubUsername, setGithubUsername] = useState('');
   const [githubPassword, setGithubPassword] = useState('');
-  const [githubEmail, setGithubEmail] = useState<string | undefined>(undefined);
-  const [repos, setRepos] = useState<any[]>([]);
-  const [repo, setRepo] = useState<string | undefined>(undefined);
+  const [githubEmail, setGithubEmail] = useState<string>('');
+  const [repos, setRepos] = useState<Repo[]>([]);
+  const [repo, setRepo] = useState<Repo | undefined>(undefined);
 
   if (chrome && chrome.storage) {
     chrome.storage.local.get('origin', data => {
@@ -100,40 +108,75 @@ function MainPage() {
     });
   }
 
-  async function upload_github() {
-    if (githubEmail === undefined) {
-      const email = await get_email(githubUsername, githubPassword);
-      if (email === null) {
-        setMode(Mode.Email);
-        return;
-      }
-      setGithubEmail(email);
+  function body() {
+    switch (mode) {
+      case Mode.None:
+        return (
+          <div/>
+        )
+      case Mode.Username:
+        return (
+          <Username username={githubUsername} setUsername={name => setGithubUsername(name)} nextStep={nextStep}/>
+        )
+      case Mode.Email:
+        return (
+          <Email email={githubEmail} setEmail={email => setGithubEmail(email)} nextStep={nextStep}/>
+        )
+      case Mode.Repo:
+        return (
+          <Repository repos={repos} setRepo={repo => setRepo(repo)} nextStep={nextStep}/>
+        )
+      case Mode.Password:
+        return (
+          <Password password={githubPassword} setPassword={pw => setGithubPassword(pw)} nextStep={nextStep}/>
+        )
+      default:
+        throw new Error("Unreachable code");
     }
-    if (repo === undefined) {
-      const repos = await get_repos(githubUsername, githubPassword);
-      if (repos instanceof Array) {
-        setRepos(repos);
-        setMode(Mode.Repo);
-      } else {
-        return;
-      }
-    }
-
-    // push_source({username: githubUsername, password: githubPassword, email: githubEmail, repo}, {})
   }
 
-  const head = header(site, username);
+  async function nextStep() {
+    console.log(mode);
+    switch (mode) {
+      case Mode.None:
+        return setMode(Mode.Username);
+      case Mode.Username:
+        const repos = await get_repos(githubUsername);
+        console.log(repos);
+        if (repos != null)
+          setRepos(repos);
+        return setMode(Mode.Repo);
+      case Mode.Repo:
+        return setMode(Mode.Password);
+      case Mode.Password:
+        const email = await get_email(githubUsername, githubPassword);
+        if (email !== null)
+          setGithubEmail(email);
+        return setMode(Mode.Email);
+      case Mode.Email:
+        if (username !== undefined)
+          await boj_github(username, {
+            username: githubUsername,
+            password: githubPassword,
+            email: githubEmail,
+            repo: repo?.name
+          });
+        return setMode(Mode.None);
+      default:
+        throw new Error("Unreachable code");
+    }
+  }
 
   return (
     <div>
-      {head}
+      {header(site, username)}
       <div>
         <Button
           className={classes.button}
           variant="contained"
           color="primary"
           startIcon={<GitHubIcon/>}
-          onClick={() => mode === Mode.Github ? setMode(Mode.None) : setMode(Mode.Github)}>
+          onClick={nextStep}>
           깃헙 업로드
         </Button>
         <Button
@@ -144,42 +187,7 @@ function MainPage() {
           onClick={() => get_problem_function(site, username)}>
           다운로드
         </Button><br/>
-        {
-          mode === Mode.Github ? (
-            <div>
-              <Input value={githubUsername} onChange={e => setGithubUsername(e.target.value)} placeholder="Github ID"/>
-              <Input value={githubPassword} onChange={e => setGithubPassword(e.target.value)} placeholder="Github Password"/>
-              <Button onClick={upload_github}/>
-            </div>
-          ) : (
-            <div/>
-          )
-        }
-        {
-          mode === Mode.Email ? (
-            <div>
-              <Input value={githubEmail} onChange={e => setGithubEmail(e.target.value)} placeholder="Github Email"/>
-              <Button onClick={upload_github}/>
-            </div>
-          ) : (
-            <div/>
-          )
-        }
-        {
-          mode === Mode.Repo ? (
-            <div>
-              {
-                repos.map(r => (
-                  <Card>
-
-                  </Card>
-                ))
-              }
-            </div>
-          ) : (
-            <div/>
-          )
-        }
+        {body()}
       </div>
     </div>
   )

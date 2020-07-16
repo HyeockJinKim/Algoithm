@@ -1,6 +1,6 @@
 import {get_first_row, get_html, get_cell_index, get_url, get_text_from_id} from "./request";
 import {boj_language_to_language, language_to_extension} from "./language";
-import {push_source, UserConfig} from "./github";
+import {new_algoithm_branch, push_source, UserConfig} from "./github";
 
 const JSZip = require(`jszip`);
 const fileSaver = require(`file-saver`);
@@ -180,11 +180,10 @@ export async function boj_zip(username: string) {
 
 export async function boj_github(username: string, config: UserConfig) {
   const language_count = {};
+  await new_algoithm_branch(config);
   await get_boj_source(username, language_count)
     .then(sources => Promise.all(sources.map(res =>
       res.then(source => {
         push_source(config, source);
-
       }))));
-
 }
