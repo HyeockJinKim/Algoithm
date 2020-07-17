@@ -17,6 +17,13 @@ export type Repo = {
   description: string | null;
 }
 
+export type TreeItem = {
+  path: string;
+  sha: string;
+  mode: string;
+  type: string;
+};
+
 async function delete_branch(branch_url: string, basic: string, branch_name: string): Promise<void> {
   await fetch(`${branch_url}/heads/${branch_name}`, {
     method: "DELETE",
@@ -59,37 +66,92 @@ export async function new_algoithm_branch(config: UserConfig): Promise<Response>
   });
 }
 
-async function push_file(config: UserConfig, msg: string, content: string, url: string) {
-  await fetch(url, {
-    method: "PUT",
+export function make_blob(config: UserConfig, content: string, path: string): Promise<TreeItem> {
+  return fetch(` https://api.github.com/repos/${config.username}/${config.repo}/git/blobs`, {
+    method: "POST",
     headers: {
+      Accept: "application/vnd.github.v3+json",
       Authorization: "Basic " + btoa(config.username + ":" + config.password),
       "Content-Type": "application/x-www-form-urlencoded",
     },
     body: JSON.stringify({
-      message: msg,
-      content: btoa(unescape(encodeURIComponent(content))),
-      committer: {
-        name: config.username,
-        email: config.email,
-      },
-      branch: "algoithm",
-    }),
-  });
+      content,
+      encoding: "utf-8"
+    })
+  }).then(x => x.json())
+    .then(x => ({
+      path,
+      sha: x.sha,
+      mode: "100644",
+      type: "blob",
+    }));
 }
 
-export async function push_source(config: UserConfig, source: Source) {
+export function get_ref(config: UserConfig): Promise<string> {
+  return fetch(`https://api.github.com/repos/${config.username}/${config.repo}/git/ref/heads/master`)
+    .then(x => x.json())
+    .then(x => x.object.sha);
+}
+
+export function make_tree(config: UserConfig, tree_items: TreeItem[], base_tree: string): Promise<string> {
+  return fetch(`https://api.github.com/repos/${config.username}/${config.repo}/git/trees`, {
+    method: "POST",
+    headers: {
+      Accept: "application/vnd.github.v3+json",
+      Authorization: "Basic " + btoa(config.username + ":" + config.password),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: JSON.stringify({
+      tree: tree_items,
+      base_tree
+    })
+  }).then(x => x.json())
+    .then(x => x.sha);
+}
+
+export function make_commit(config: UserConfig, message: string, tree: string, parent: string): Promise<string> {
+  return fetch(`https://api.github.com/repos/${config.username}/${config.repo}/git/commits`, {
+    method: "POST",
+    headers: {
+      Accept: "application/vnd.github.v3+json",
+      Authorization: "Basic " + btoa(config.username + ":" + config.password),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: JSON.stringify({
+      message,
+      tree,
+      parents: [parent]
+    })
+  }).then(x => x.json())
+    .then(x => x.sha);
+}
+
+export function update_branch(config: UserConfig, ref: string) {
+  return fetch(`https://api.github.com/repos/${config.username}/${config.repo}/git/refs/heads/master`, {
+    method: "PATCH",
+    headers: {
+      Accept: "application/vnd.github.v3+json",
+      Authorization: "Basic " + btoa(config.username + ":" + config.password),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: JSON.stringify({
+      sha: ref
+    })
+  }).then(x => x.json());
+}
+
+export async function make_source_files(config: UserConfig, source: Source): Promise<TreeItem[]> {
   const path = `boj/${source.title}/${source.filename}`,
-    readme_path = `boj/${source.title}/README.md`,
-    branch_url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/${path}`,
-    readme_url = `https://api.github.com/repos/${config.username}/${config.repo}/contents/${readme_path}`;
-  await push_file(config, source.title + " Problem Solved", source.readme, readme_url);
-  await push_file(config, source.title + " Problem Solved", source.source, branch_url);
+    readme_path = `boj/${source.title}/README.md`;
+
+  return [
+    await make_blob(config, source.source, path),
+    await make_blob(config, source.readme, readme_path)
+  ];
 }
 
 export async function get_email(username: string, password: string): Promise<string | null> {
-  const url = `https://api.github.com/users/${username}`
-  return await fetch(url, {
+  return await fetch(`https://api.github.com/users/${username}`, {
     method: "GET",
     headers: {
       Authorization: "Basic " + btoa(username + ":" + password),

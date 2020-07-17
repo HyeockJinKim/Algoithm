@@ -142,7 +142,6 @@ function MainPage() {
         return setMode(Mode.Username);
       case Mode.Username:
         const repos = await get_repos(githubUsername);
-        console.log(repos);
         if (repos != null)
           setRepos(repos);
         return setMode(Mode.Repo);
