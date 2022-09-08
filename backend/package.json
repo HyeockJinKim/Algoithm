@@ -13,7 +13,7 @@
   "dependencies": {
     "babel-loader": "^8.1.0",
     "file-saver": "^2.0.2",
-    "jszip": "^3.3.0",
+    "jszip": "^3.7.0",
     "webpack": "^4.42.1",
     "webpack-cli": "^3.3.11"
   },
